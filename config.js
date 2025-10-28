@@ -1,8 +1,9 @@
 // Discord OAuth Configuration
 const DISCORD_CONFIG = {
-    // Replace these with your actual Discord application credentials
-    CLIENT_ID: '1432798922757115985',
-    CLIENT_SECRET: 'nYYLQp8-BoS7MGKpfpmRiI62bKJzT3bE',
+    // ⚠️ IMPORTANT: Replace these with your actual Discord application credentials
+    // Get these from: https://discord.com/developers/applications
+    CLIENT_ID: 'YOUR_DISCORD_CLIENT_ID',
+    CLIENT_SECRET: 'YOUR_DISCORD_CLIENT_SECRET',
     
     // ⚠️ REDIRECT URI - This will automatically detect your URL
     // For GitHub Pages: https://yourusername.github.io/repository-name

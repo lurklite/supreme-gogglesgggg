@@ -10,18 +10,26 @@ class AuthManager {
         // Check for OAuth callback
         const urlParams = new URLSearchParams(window.location.search);
         const code = urlParams.get('code');
+        const error = urlParams.get('error');
+
+        if (error) {
+            console.error('OAuth error:', error);
+            showNotification('Login Failed', 'Discord authorization was denied or failed', 'error');
+            // Clean URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+            return false;
+        }
 
         if (code) {
             // Handle OAuth callback
-            await this.handleCallback(code);
+            const success = await this.handleCallback(code);
             // Clean URL
             window.history.replaceState({}, document.title, window.location.pathname);
+            return success;
         } else {
             // Check for existing session
-            this.loadSession();
+            return this.loadSession();
         }
-
-        return this.isAuthenticated();
     }
 
     // Handle OAuth callback
@@ -213,6 +221,13 @@ class AuthManager {
 
     // Initiate Discord OAuth flow
     login() {
+        // Debug: Show what URL we're using
+        console.log('=== DISCORD OAUTH DEBUG ===');
+        console.log('Current URL:', window.location.href);
+        console.log('Redirect URI:', DISCORD_CONFIG.REDIRECT_URI);
+        console.log('OAuth URL:', getDiscordOAuthURL());
+        console.log('==========================');
+        
         window.location.href = getDiscordOAuthURL();
     }
 }

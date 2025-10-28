@@ -44,6 +44,12 @@
                     <p>🔒 Secure OAuth 2.0 Authentication</p>
                     <p>We only access your Discord username and avatar</p>
                 </div>
+
+                <div class="info-box" id="debug-info" style="margin-top: 15px; background: rgba(0, 255, 0, 0.1); border: 1px solid rgba(0, 255, 0, 0.3);">
+                    <p style="color: #0f0; font-weight: bold;">🔧 Debug Info</p>
+                    <p style="color: #0f0; font-size: 11px; word-break: break-all;">Redirect URI: <span id="redirect-uri-display">Loading...</span></p>
+                    <p style="color: #888; font-size: 10px; margin-top: 5px;">Add this EXACT URL to Discord Developer Portal → OAuth2 → Redirects</p>
+                </div>
             </div>
         </div>
     </div>
@@ -162,6 +168,15 @@ local Library = LURKOUT:Init()
     </div>
 
     <script src="config.js"></script>
+    <script>
+        // Show redirect URI on login screen for debugging
+        document.addEventListener('DOMContentLoaded', () => {
+            const display = document.getElementById('redirect-uri-display');
+            if (display) {
+                display.textContent = DISCORD_CONFIG.REDIRECT_URI;
+            }
+        });
+    </script>
     <script src="auth.js"></script>
     <script src="particles.js"></script>
     <script src="builder.js"></script>
