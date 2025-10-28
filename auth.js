@@ -21,6 +21,7 @@ class AuthManager {
         }
 
         if (code) {
+            console.log('OAuth code received, processing...');
             // Handle OAuth callback
             const success = await this.handleCallback(code);
             // Clean URL
@@ -28,57 +29,101 @@ class AuthManager {
             return success;
         } else {
             // Check for existing session
-            return this.loadSession();
+            const hasSession = this.loadSession();
+            if (!hasSession) {
+                console.log('No session found, authentication required');
+            }
+            return hasSession;
         }
     }
 
     // Handle OAuth callback
     async handleCallback(code) {
+        console.log('Handling OAuth callback...');
+        
         try {
-            // Exchange code for token
-            const tokenData = await this.exchangeCode(code);
+            // Fetch user info directly with the code
+            const userData = await this.fetchUserInfoWithCode(code);
             
-            if (tokenData.access_token) {
-                this.token = tokenData.access_token;
+            if (userData) {
+                console.log('User data received:', userData.username);
                 
-                // Fetch user info
-                const userData = await this.fetchUserInfo(this.token);
+                this.token = code; // Store the code as token for session
+                this.user = {
+                    id: userData.id,
+                    username: userData.username,
+                    discriminator: userData.discriminator || '0',
+                    avatar: userData.avatar,
+                    displayName: userData.global_name || userData.username
+                };
                 
-                if (userData) {
-                    this.user = {
-                        id: userData.id,
-                        username: userData.username,
-                        discriminator: userData.discriminator,
-                        avatar: userData.avatar,
-                        displayName: userData.global_name || userData.username
-                    };
-                    
-                    // Save session
-                    this.saveSession();
-                    
-                    showNotification('Success', `Logged in as ${this.user.displayName}! Refreshing...`, 'success');
-                    
-                    // Refresh page after a short delay
-                    setTimeout(() => {
-                        window.location.reload();
-                    }, 1000);
-                    
-                    return true;
-                }
+                // Save session
+                this.saveSession();
+                
+                showNotification('Success', `Welcome ${this.user.displayName}!`, 'success');
+                
+                // Refresh page after a short delay
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+                
+                return true;
+            } else {
+                console.error('Failed to get user data');
+                showNotification('Error', 'Failed to get Discord user information', 'error');
             }
         } catch (error) {
             console.error('OAuth callback error:', error);
-            showNotification('Error', 'Failed to authenticate with Discord', 'error');
+            showNotification('Error', 'Authentication failed: ' + error.message, 'error');
         }
         
         return false;
     }
 
+    // Fetch user info using the authorization code
+    async fetchUserInfoWithCode(code) {
+        console.log('Attempting to fetch user info...');
+        
+        try {
+            // First, try to exchange code for token if CLIENT_SECRET exists
+            if (typeof DISCORD_CONFIG !== 'undefined' && DISCORD_CONFIG.CLIENT_SECRET) {
+                console.log('Exchanging code for token...');
+                const tokenData = await this.exchangeCodeForToken(code);
+                
+                if (tokenData && tokenData.access_token) {
+                    console.log('Token received, fetching user...');
+                    return await this.fetchUserInfo(tokenData.access_token);
+                }
+            }
+            
+            // Fallback: Try direct API call (this won't work in production but helps with debugging)
+            console.log('Attempting direct user fetch...');
+            const response = await fetch('https://discord.com/api/v10/users/@me', {
+                headers: {
+                    'Authorization': `Bearer ${code}`
+                }
+            });
+
+            if (response.ok) {
+                const userData = await response.json();
+                console.log('User fetched successfully via direct call');
+                return userData;
+            } else {
+                const errorText = await response.text();
+                console.error('Direct fetch failed:', response.status, errorText);
+            }
+        } catch (error) {
+            console.error('Error fetching user info:', error);
+        }
+        
+        return null;
+    }
+
     // Exchange authorization code for access token
-    async exchangeCode(code) {
+    async exchangeCodeForToken(code) {
         const params = new URLSearchParams({
             client_id: '1432798922757115985',
-            client_secret: DISCORD_CONFIG.CLIENT_SECRET, // You'll need to set this
+            client_secret: 'pq_pp9Sp5lK8n3f8LC2-xAvxEROgDFdy',
             grant_type: 'authorization_code',
             code: code,
             redirect_uri: 'https://lurklite.github.io/supreme-gogglesgggg/'
@@ -98,11 +143,11 @@ class AuthManager {
             } else {
                 const errorData = await response.text();
                 console.error('Token exchange failed:', response.status, errorData);
-                throw new Error('Token exchange failed');
+                return null;
             }
         } catch (error) {
             console.error('Token exchange error:', error);
-            throw error;
+            return null;
         }
     }
 
@@ -117,7 +162,7 @@ class AuthManager {
 
             if (response.ok) {
                 const userData = await response.json();
-                console.log('Discord user fetched:', userData.username);
+                console.log('Discord user authenticated:', userData.username);
                 return userData;
             } else {
                 console.error('Failed to fetch user info:', response.status);
@@ -129,7 +174,7 @@ class AuthManager {
         }
     }
 
-    // Save session to memory (user-specific)
+    // Save session
     saveSession() {
         const session = {
             user: this.user,
@@ -137,45 +182,40 @@ class AuthManager {
             timestamp: Date.now()
         };
         
-        // Store session data in memory with user ID as key
-        const storageKey = `discord_session_${this.user.id}`;
-        const sessionData = JSON.stringify(session);
+        // Create a simple in-memory storage
+        if (!window._discordSessions) {
+            window._discordSessions = {};
+        }
         
-        // Store in memory for this session
-        window.sessionStorage = window.sessionStorage || {};
-        window.sessionStorage[storageKey] = sessionData;
+        const storageKey = `user_${this.user.id}`;
+        window._discordSessions[storageKey] = session;
+        window._discordSessions['current_user'] = this.user.id;
         
-        // Also keep track of current user
-        window.sessionStorage['current_user_id'] = this.user.id;
-        
-        console.log(`Session saved for user: ${this.user.displayName} (${this.user.id})`);
+        console.log(`✓ Session saved for: ${this.user.displayName} (${this.user.id})`);
     }
 
-    // Load session from memory
+    // Load session
     loadSession() {
-        const currentUserId = window.sessionStorage?.['current_user_id'];
-        
-        if (!currentUserId) {
+        if (!window._discordSessions || !window._discordSessions['current_user']) {
             return false;
         }
         
-        const storageKey = `discord_session_${currentUserId}`;
-        const sessionData = window.sessionStorage?.[storageKey];
+        const userId = window._discordSessions['current_user'];
+        const storageKey = `user_${userId}`;
+        const session = window._discordSessions[storageKey];
         
-        if (sessionData) {
+        if (session) {
             try {
-                const session = JSON.parse(sessionData);
-                
                 // Check if session is less than 7 days old
                 const daysSinceLogin = (Date.now() - session.timestamp) / (1000 * 60 * 60 * 24);
                 
                 if (daysSinceLogin < 7) {
                     this.user = session.user;
                     this.token = session.token;
-                    console.log(`Session loaded for user: ${this.user.displayName} (${this.user.id})`);
+                    console.log(`✓ Session restored for: ${this.user.displayName}`);
                     return true;
                 } else {
-                    // Session expired
+                    console.log('Session expired (>7 days)');
                     this.clearSession();
                 }
             } catch (error) {
@@ -189,12 +229,12 @@ class AuthManager {
 
     // Clear session
     clearSession() {
-        if (this.user) {
-            const storageKey = `discord_session_${this.user.id}`;
-            delete window.sessionStorage?.[storageKey];
+        if (this.user && window._discordSessions) {
+            const storageKey = `user_${this.user.id}`;
+            delete window._discordSessions[storageKey];
+            delete window._discordSessions['current_user'];
         }
         
-        delete window.sessionStorage?.['current_user_id'];
         this.user = null;
         this.token = null;
         console.log('Session cleared');
@@ -202,7 +242,9 @@ class AuthManager {
 
     // Check if user is authenticated
     isAuthenticated() {
-        return this.user !== null && this.token !== null;
+        const authenticated = this.user !== null && this.token !== null;
+        console.log('Auth check:', authenticated ? `✓ ${this.user.displayName}` : '✗ Not authenticated');
+        return authenticated;
     }
 
     // Get user info
@@ -230,19 +272,46 @@ class AuthManager {
         // Reload page to show login screen
         setTimeout(() => {
             window.location.reload();
-        }, 1000);
+        }, 500);
     }
 
     // Initiate Discord OAuth flow
     login() {
+        console.log('=== INITIATING DISCORD LOGIN ===');
+        console.log('Redirecting to Discord OAuth...');
+        
         // Use the Discord-generated OAuth URL
         const discordOAuthURL = 'https://discord.com/oauth2/authorize?client_id=1432798922757115985&response_type=code&redirect_uri=https%3A%2F%2Flurklite.github.io%2Fsupreme-gogglesgggg%2F&scope=identify';
         
-        console.log('=== DISCORD OAUTH ===');
-        console.log('Redirecting to Discord for authentication...');
-        console.log('====================');
-        
         window.location.href = discordOAuthURL;
+    }
+
+    // Force authentication - blocks access until logged in
+    requireAuth() {
+        if (!this.isAuthenticated()) {
+            console.log('⚠ Authentication required - redirecting to login');
+            
+            // Hide main content
+            const mainContent = document.querySelector('.container, main, #app, body > div');
+            if (mainContent) {
+                mainContent.style.display = 'none';
+            }
+            
+            // Show login requirement message
+            const loginRequired = document.createElement('div');
+            loginRequired.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;font-family:sans-serif;';
+            loginRequired.innerHTML = `
+                <h2>Discord Login Required</h2>
+                <p>You must log in with Discord to access this site.</p>
+                <button onclick="authManager.login()" style="padding:10px 20px;font-size:16px;cursor:pointer;background:#5865F2;color:white;border:none;border-radius:5px;">
+                    Login with Discord
+                </button>
+            `;
+            document.body.appendChild(loginRequired);
+            
+            return false;
+        }
+        return true;
     }
 }
 
