@@ -1,8 +1,8 @@
 // Discord OAuth Configuration
 const DISCORD_CONFIG = {
     // Replace these with your actual Discord application credentials
-    CLIENT_ID: 'YOUR_DISCORD_CLIENT_ID',
-    CLIENT_SECRET: 'YOUR_DISCORD_CLIENT_SECRET',
+    CLIENT_ID: '1432798922757115985',
+    CLIENT_SECRET: 'nYYLQp8-BoS7MGKpfpmRiI62bKJzT3bE',
     REDIRECT_URI: window.location.origin + '/callback',
     
     // OAuth2 URLs
