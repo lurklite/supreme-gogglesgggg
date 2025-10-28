@@ -3,15 +3,23 @@ const DISCORD_CONFIG = {
     // Replace these with your actual Discord application credentials
     CLIENT_ID: '1432798922757115985',
     CLIENT_SECRET: 'nYYLQp8-BoS7MGKpfpmRiI62bKJzT3bE',
-    REDIRECT_URI: window.location.origin + '/callback',
     
-    // OAuth2 URLs
+    // ⚠️ REDIRECT URI - This will automatically detect your URL
+    // For GitHub Pages: https://yourusername.github.io/repository-name
+    // For localhost: http://localhost:8080
+    // 
+    // ADD BOTH OF THESE TO DISCORD DEVELOPER PORTAL:
+    // 1. Your GitHub Pages URL (https://yourusername.github.io/repo-name)
+    // 2. http://localhost:8080 (for local testing)
+    REDIRECT_URI: window.location.origin + window.location.pathname.replace(/\/$/, ''),
+    
+    // OAuth2 URLs (don't change these)
     AUTHORIZATION_URL: 'https://discord.com/api/oauth2/authorize',
     TOKEN_URL: 'https://discord.com/api/oauth2/token',
     API_ENDPOINT: 'https://discord.com/api/v10',
     
-    // Scopes needed
-    SCOPES: ['identify']
+    // Scopes - what info we request from Discord
+    SCOPES: ['identify']  // Only username and avatar
 };
 
 // Application Configuration
