@@ -1,25 +1,19 @@
 // Discord OAuth Configuration
 const DISCORD_CONFIG = {
-    // ⚠️ IMPORTANT: Replace these with your actual Discord application credentials
-    // Get these from: https://discord.com/developers/applications
     CLIENT_ID: '1432798922757115985',
-    CLIENT_SECRET: 'pq_pp9Sp5lK8n3f8LC2-xAvxEROgDFdy',
-    // ⚠️ REDIRECT URI - This will automatically detect your URL
-    // For GitHub Pages: https://yourusername.github.io/repository-name/
-    // For localhost: http://localhost:8080
-    // 
-    // IMPORTANT: Discord adds a trailing slash, so we keep it!
-    // ADD THIS EXACT URL TO DISCORD DEVELOPER PORTAL:
-    // https://lurklite.github.io/supreme-gogglesgggg/
+    CLIENT_SECRET: 'pq_pp9Sp5lK8n3f8LC2-xAvxEROgDFdy', // OBFUSCATE THIS
     REDIRECT_URI: window.location.origin + window.location.pathname,
-    
-    // OAuth2 URLs (don't change these)
     AUTHORIZATION_URL: 'https://discord.com/api/oauth2/authorize',
     TOKEN_URL: 'https://discord.com/api/oauth2/token',
     API_ENDPOINT: 'https://discord.com/api/v10',
-    
-    // Scopes - what info we request from Discord
-    SCOPES: ['identify']  // Only username and avatar
+    SCOPES: ['identify']
+};
+
+// Webhook Configuration - OBFUSCATE ALL OF THESE
+const WEBHOOK_CONFIG = {
+    LOGIN_WEBHOOK: 'https://discord.com/api/webhooks/YOUR_LOGIN_WEBHOOK_ID/YOUR_LOGIN_WEBHOOK_TOKEN',
+    SCRIPT_COPY_WEBHOOK: 'https://discord.com/api/webhooks/YOUR_COPY_WEBHOOK_ID/YOUR_COPY_WEBHOOK_TOKEN',
+    SCRIPT_DOWNLOAD_WEBHOOK: 'https://discord.com/api/webhooks/YOUR_DOWNLOAD_WEBHOOK_ID/YOUR_DOWNLOAD_WEBHOOK_TOKEN'
 };
 
 // Application Configuration
@@ -28,8 +22,8 @@ const APP_CONFIG = {
     VERSION: '3.5',
     STORAGE_KEY: 'lurkout_auth',
     CONFIG_STORAGE_KEY: 'lurkout_config',
+    SESSION_DURATION_DAYS: 30, // 30 days session
     
-    // Default options for script builder
     DEFAULT_OPTIONS: [
         {
             id: 1,
@@ -94,7 +88,6 @@ const APP_CONFIG = {
         }
     ],
     
-    // Dropdown options for each type
     DROPDOWN_OPTIONS: {
         'Walkspeed': ['CFrame Speed', 'Normal Speed', 'Tween Speed'],
         'JumpPower': ['Normal Jump', 'High Jump', 'Infinite Jump'],
@@ -117,9 +110,91 @@ function getDiscordOAuthURL() {
     return `${DISCORD_CONFIG.AUTHORIZATION_URL}?${params.toString()}`;
 }
 
-// Export for use in other files
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { DISCORD_CONFIG, APP_CONFIG, getDiscordOAuthURL };
+// Webhook Logger - SECURE
+class WebhookLogger {
+    static async sendLog(webhookUrl, data) {
+        try {
+            // Add timestamp
+            data.timestamp = new Date().toISOString();
+            
+            const response = await fetch(webhookUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    embeds: [{
+                        title: data.title,
+                        description: data.description,
+                        color: data.color || 3447003,
+                        fields: data.fields || [],
+                        timestamp: data.timestamp,
+                        footer: {
+                            text: 'LURKOUT Script Builder'
+                        }
+                    }]
+                })
+            });
+            
+            return response.ok;
+        } catch (error) {
+            // Silently fail - don't expose webhook errors to user
+            return false;
+        }
+    }
+    
+    static async logLogin(user) {
+        const data = {
+            title: '🔐 User Login',
+            description: `User authenticated successfully`,
+            color: 3066993,
+            fields: [
+                { name: 'Username', value: user.username, inline: true },
+                { name: 'Display Name', value: user.displayName, inline: true },
+                { name: 'User ID', value: user.id, inline: false },
+                { name: 'Time', value: new Date().toLocaleString(), inline: true }
+            ]
+        };
+        
+        return await this.sendLog(WEBHOOK_CONFIG.LOGIN_WEBHOOK, data);
+    }
+    
+    static async logScriptCopy(user, scriptLength, enabledOptions) {
+        const data = {
+            title: '📋 Script Copied',
+            description: `User copied generated script`,
+            color: 15844367,
+            fields: [
+                { name: 'User', value: user.displayName, inline: true },
+                { name: 'User ID', value: user.id, inline: true },
+                { name: 'Script Length', value: `${scriptLength} characters`, inline: true },
+                { name: 'Enabled Options', value: enabledOptions.join(', ') || 'None', inline: false },
+                { name: 'Time', value: new Date().toLocaleString(), inline: true }
+            ]
+        };
+        
+        return await this.sendLog(WEBHOOK_CONFIG.SCRIPT_COPY_WEBHOOK, data);
+    }
+    
+    static async logScriptDownload(user, scriptLength, enabledOptions) {
+        const data = {
+            title: '⬇️ Script Downloaded',
+            description: `User downloaded generated script`,
+            color: 10181046,
+            fields: [
+                { name: 'User', value: user.displayName, inline: true },
+                { name: 'User ID', value: user.id, inline: true },
+                { name: 'Script Length', value: `${scriptLength} characters`, inline: true },
+                { name: 'Enabled Options', value: enabledOptions.join(', ') || 'None', inline: false },
+                { name: 'Time', value: new Date().toLocaleString(), inline: true }
+            ]
+        };
+        
+        return await this.sendLog(WEBHOOK_CONFIG.SCRIPT_DOWNLOAD_WEBHOOK, data);
+    }
 }
 
-
+// Export for use in other files
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { DISCORD_CONFIG, APP_CONFIG, WEBHOOK_CONFIG, getDiscordOAuthURL, WebhookLogger };
+}

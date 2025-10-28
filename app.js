@@ -6,7 +6,6 @@ class App {
     }
 
     async init() {
-        // Wait for DOM to be ready
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', () => this.start());
         } else {
@@ -15,11 +14,11 @@ class App {
     }
 
     async start() {
-        // Initialize authentication
         const isAuthenticated = await authManager.init();
 
         if (isAuthenticated) {
             this.showAppScreen();
+            authManager.startSessionKeepAlive();
         } else {
             this.showLoginScreen();
         }
@@ -36,10 +35,9 @@ class App {
         document.getElementById('login-screen').classList.remove('active');
         document.getElementById('app-screen').classList.add('active');
 
-        // Update user info
         this.updateUserInfo();
-
-        // Check if we should show Discord popup
+        this.updateOnlineCount();
+        this.startOnlineCountUpdater();
         this.checkAndShowDiscordPopup();
     }
 
@@ -51,24 +49,35 @@ class App {
         }
     }
 
+    updateOnlineCount() {
+        const onlineUsers = authManager.getOnlineUsers();
+        const count = Object.keys(onlineUsers).length;
+        
+        const onlineCountElement = document.getElementById('online-count');
+        if (onlineCountElement) {
+            onlineCountElement.textContent = `${count} ${count === 1 ? 'user' : 'users'} online`;
+        }
+    }
+
+    startOnlineCountUpdater() {
+        setInterval(() => {
+            this.updateOnlineCount();
+        }, 30000);
+    }
+
     checkAndShowDiscordPopup() {
         const dontShow = localStorage.getItem('lurkout_dont_show_discord');
         const lastShown = localStorage.getItem('lurkout_last_discord_popup');
         const today = new Date().toDateString();
 
-        // Check if user opted out or if already shown today
         if (dontShow === 'true') return;
         if (lastShown === today) return;
 
-        // Show the popup
         this.showDiscordPopup();
-
-        // Mark as shown today
         localStorage.setItem('lurkout_last_discord_popup', today);
     }
 
     showDiscordPopup() {
-        // Create popup if it doesn't exist
         let popup = document.getElementById('discord-welcome-popup');
         if (!popup) {
             popup = document.createElement('div');
@@ -97,7 +106,6 @@ class App {
             `;
             document.body.appendChild(popup);
 
-            // Add event listeners
             popup.querySelector('.welcome-popup-close').addEventListener('click', () => {
                 this.closeDiscordPopup();
             });
@@ -115,7 +123,6 @@ class App {
             });
         }
 
-        // Show the popup
         popup.classList.add('active');
     }
 
@@ -127,7 +134,6 @@ class App {
     }
 
     setupEventListeners() {
-        // Discord login button
         const loginBtn = document.getElementById('discord-login-btn');
         if (loginBtn) {
             loginBtn.addEventListener('click', () => {
@@ -135,7 +141,6 @@ class App {
             });
         }
 
-        // Logout button
         const logoutBtn = document.getElementById('logout-btn');
         if (logoutBtn) {
             logoutBtn.addEventListener('click', () => {
@@ -143,7 +148,6 @@ class App {
             });
         }
 
-        // Tab switching
         const tabButtons = document.querySelectorAll('.tab-btn');
         tabButtons.forEach(btn => {
             btn.addEventListener('click', () => {
@@ -154,13 +158,11 @@ class App {
     }
 
     switchTab(tabName) {
-        // Update active button
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.classList.remove('active');
         });
         document.querySelector(`.tab-btn[data-tab="${tabName}"]`).classList.add('active');
 
-        // Update active content
         document.querySelectorAll('.tab-content').forEach(content => {
             content.classList.remove('active');
         });
@@ -170,7 +172,6 @@ class App {
     }
 }
 
-// Notification System
 function showNotification(title, message, type = 'success') {
     const container = document.getElementById('notification-container');
     
@@ -185,7 +186,6 @@ function showNotification(title, message, type = 'success') {
     
     container.appendChild(notification);
     
-    // Auto remove after 3 seconds
     setTimeout(() => {
         notification.style.opacity = '0';
         notification.style.transform = 'translateX(100px)';
@@ -197,7 +197,6 @@ function showNotification(title, message, type = 'success') {
     }, 3000);
 }
 
-// Utility Functions
 function formatDate(date) {
     return new Date(date).toLocaleDateString('en-US', {
         year: 'numeric',
@@ -220,25 +219,25 @@ function debounce(func, wait) {
     };
 }
 
-// Initialize app
 const app = new App();
 
-// Export for debugging
 window.app = app;
 window.showNotification = showNotification;
 
-// Handle page visibility change
+window.updateOnlineCount = () => {
+    if (typeof app !== 'undefined') {
+        app.updateOnlineCount();
+    }
+};
+
 document.addEventListener('visibilitychange', () => {
     if (!document.hidden && authManager.isAuthenticated()) {
-        // Refresh token if needed
         console.log('Page visible again');
     }
 });
 
-// Prevent accidental page close if user has unsaved changes
 window.addEventListener('beforeunload', (e) => {
     if (scriptBuilder && scriptBuilder.options.length > 0) {
-        // Only show warning if there are options configured
         const options = scriptBuilder.options;
         const hasChanges = options.some(opt => opt.enabled);
         

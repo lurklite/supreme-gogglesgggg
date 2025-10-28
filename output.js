@@ -1,4 +1,4 @@
-// Output Generator with Syntax Highlighting
+// Output Generator with Syntax Highlighting and Webhook Logging
 class OutputGenerator {
     constructor() {
         this.codeElement = document.getElementById('code-content');
@@ -7,12 +7,10 @@ class OutputGenerator {
     }
 
     init() {
-        // Setup copy button
         document.getElementById('copy-output-btn').addEventListener('click', () => {
             this.copyToClipboard();
         });
 
-        // Setup download button
         document.getElementById('download-output-btn').addEventListener('click', () => {
             this.downloadScript();
         });
@@ -34,30 +32,25 @@ class OutputGenerator {
 
 `;
 
-        // Library loader
         script += `-- Load LURKOUT UI Library
 loadstring(game:HttpGet("https://raw.githubusercontent.com/lurkout/ui-library/main/source.lua"))()
 
 `;
 
-        // Initialize library
         script += `-- Initialize Library
 local Library = LURKOUT:Init()
 
 `;
 
-        // Create main tab
         script += `-- Create Main Tab
 local MainTab = Library:CreateTab("Main")
 
 `;
 
-        // Add each enabled option
         enabledOptions.forEach(option => {
             script += this.generateOptionCode(option);
         });
 
-        // Settings tab
         script += `
 -- Settings Tab
 local SettingsTab = Library:CreateTab("Settings")
@@ -72,7 +65,6 @@ end)
 
 `;
 
-        // Footer
         script += `-- End of Generated Script
 print("LURKOUT Script loaded successfully!")
 `;
@@ -109,7 +101,6 @@ print("LURKOUT Script loaded successfully!")
     }
 
     generateWalkspeedCode(option) {
-        // Get the code for the selected mode
         const modeCode = option.modeScripts && option.modeScripts[option.mode] 
             ? option.modeScripts[option.mode]
             : 'LocalPlayer.Character.Humanoid.WalkSpeed = 50';
@@ -259,49 +250,40 @@ end)
     }
 
     highlightLua(code) {
-        // Lua keywords
         const keywords = [
             'local', 'function', 'end', 'if', 'then', 'else', 'elseif',
             'for', 'while', 'do', 'repeat', 'until', 'return', 'break',
             'in', 'and', 'or', 'not', 'true', 'false', 'nil'
         ];
 
-        // Escape HTML first
         let highlighted = code
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;');
 
-        // Split into lines to process one at a time
         let lines = highlighted.split('\n');
         let result = [];
 
         for (let line of lines) {
             let processedLine = line;
             
-            // Check if line is a comment (must be checked first)
             if (processedLine.trim().startsWith('--')) {
                 result.push('<span class="comment">' + processedLine + '</span>');
                 continue;
             }
 
-            // Highlight strings (do this before keywords to avoid conflicts)
             processedLine = processedLine.replace(/"([^"]*)"/g, '<span class="string">"$1"</span>');
             processedLine = processedLine.replace(/'([^']*)'/g, "<span class='string'>'$1'</span>");
 
-            // Highlight numbers
             processedLine = processedLine.replace(/\b(\d+\.?\d*)\b/g, '<span class="number">$1</span>');
 
-            // Highlight keywords (avoid replacing inside strings/spans)
             keywords.forEach(keyword => {
                 const regex = new RegExp(`\\b(${keyword})\\b(?![^<]*>)`, 'g');
                 processedLine = processedLine.replace(regex, '<span class="keyword">$1</span>');
             });
 
-            // Highlight function names (word before opening parenthesis)
             processedLine = processedLine.replace(/\b([a-zA-Z_][a-zA-Z0-9_]*)\s*(?=\()/g, '<span class="function-name">$1</span>');
 
-            // Highlight operators
             processedLine = processedLine.replace(/([+\-*/%=<>~])/g, '<span class="operator">$1</span>');
 
             result.push(processedLine);
@@ -321,6 +303,16 @@ end)
         if (navigator.clipboard) {
             navigator.clipboard.writeText(code).then(() => {
                 showNotification('Copied', 'Script copied to clipboard!', 'success');
+                
+                // Log to webhook
+                if (typeof WebhookLogger !== 'undefined' && authManager.isAuthenticated()) {
+                    const user = authManager.getUser();
+                    const enabledOptions = scriptBuilder.options
+                        .filter(opt => opt.enabled)
+                        .map(opt => opt.name);
+                    
+                    WebhookLogger.logScriptCopy(user, code.length, enabledOptions);
+                }
             }).catch(err => {
                 console.error('Copy failed:', err);
                 this.fallbackCopy(code);
@@ -362,10 +354,19 @@ end)
         URL.revokeObjectURL(url);
         
         showNotification('Downloaded', 'Script downloaded successfully!', 'success');
+        
+        // Log to webhook
+        if (typeof WebhookLogger !== 'undefined' && authManager.isAuthenticated()) {
+            const user = authManager.getUser();
+            const enabledOptions = scriptBuilder.options
+                .filter(opt => opt.enabled)
+                .map(opt => opt.name);
+            
+            WebhookLogger.logScriptDownload(user, code.length, enabledOptions);
+        }
     }
 }
 
-// Initialize output generator when DOM is ready
 let outputGenerator = null;
 
 document.addEventListener('DOMContentLoaded', () => {
