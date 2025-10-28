@@ -2,8 +2,8 @@
 const DISCORD_CONFIG = {
     // ⚠️ IMPORTANT: Replace these with your actual Discord application credentials
     // Get these from: https://discord.com/developers/applications
-    CLIENT_ID: 'YOUR_DISCORD_CLIENT_ID',
-    CLIENT_SECRET: 'YOUR_DISCORD_CLIENT_SECRET',
+    CLIENT_ID: '1432798922757115985',
+    CLIENT_SECRET: 'pq_pp9Sp5lK8n3f8LC2-xAvxEROgDFdy',
     // ⚠️ REDIRECT URI - This will automatically detect your URL
     // For GitHub Pages: https://yourusername.github.io/repository-name/
     // For localhost: http://localhost:8080
