@@ -56,7 +56,13 @@ class AuthManager {
                     // Save session
                     this.saveSession();
                     
-                    showNotification('Success', 'Logged in successfully!', 'success');
+                    showNotification('Success', 'Logged in successfully! Refreshing...', 'success');
+                    
+                    // Refresh page after a short delay
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                    
                     return true;
                 }
             }
@@ -136,7 +142,7 @@ class AuthManager {
         };
         
         this.saveSession();
-        showNotification('Demo Mode', 'Using demo session (configure Discord OAuth for production)', 'success');
+        showNotification('Demo Mode', 'Using demo session. Configure Discord OAuth for real authentication.', 'success');
         
         return { access_token: this.token };
     }

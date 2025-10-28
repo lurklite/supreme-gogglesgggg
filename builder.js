@@ -37,12 +37,13 @@ class ScriptBuilder {
 
         // Clear config button
         document.getElementById('clear-config-btn').addEventListener('click', () => {
-            if (confirm('Are you sure you want to clear all options? This cannot be undone.')) {
-                this.options = [];
+            if (confirm('Clear all options and reset to default? This cannot be undone.')) {
+                this.options = JSON.parse(JSON.stringify(APP_CONFIG.DEFAULT_OPTIONS));
+                this.nextId = Math.max(...this.options.map(o => o.id)) + 1;
                 this.renderOptions();
                 this.updateOutput();
                 this.saveConfig();
-                showNotification('Config Cleared', 'All options have been cleared', 'success');
+                showNotification('Config Reset', 'All options reset to default', 'success');
             }
         });
 
@@ -174,8 +175,19 @@ class ScriptBuilder {
         const option = this.options.find(o => o.id === optionId);
         if (option) {
             this.currentEditingOption = option;
-            document.getElementById('modal-title').textContent = `Edit Code - ${option.name}`;
-            document.getElementById('custom-code-input').value = option.customCode || '';
+            document.getElementById('modal-title').textContent = `Edit Code - ${option.name} (${option.mode})`;
+            
+            // Load mode-specific script if available, otherwise use custom code
+            let codeToEdit = '';
+            if (option.modeScripts && option.modeScripts[option.mode]) {
+                codeToEdit = option.modeScripts[option.mode];
+            } else if (option.customCode) {
+                codeToEdit = option.customCode;
+            } else {
+                codeToEdit = `-- ${option.name} - ${option.mode}\n-- Add your code here`;
+            }
+            
+            document.getElementById('custom-code-input').value = codeToEdit;
             document.getElementById('code-modal').classList.add('active');
         }
     }
@@ -188,11 +200,19 @@ class ScriptBuilder {
     saveCustomCode() {
         if (this.currentEditingOption) {
             const code = document.getElementById('custom-code-input').value;
-            this.currentEditingOption.customCode = code;
+            
+            // Initialize modeScripts if it doesn't exist
+            if (!this.currentEditingOption.modeScripts) {
+                this.currentEditingOption.modeScripts = {};
+            }
+            
+            // Save to the current mode's script
+            this.currentEditingOption.modeScripts[this.currentEditingOption.mode] = code;
+            
             this.updateOutput();
             this.saveConfig();
             this.closeModal();
-            showNotification('Code Saved', `Custom code for ${this.currentEditingOption.name} has been saved`, 'success');
+            showNotification('Code Saved', `Custom code for ${this.currentEditingOption.name} (${this.currentEditingOption.mode}) has been saved`, 'success');
         }
     }
 

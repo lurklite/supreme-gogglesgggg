@@ -109,20 +109,17 @@ print("LURKOUT Script loaded successfully!")
     }
 
     generateWalkspeedCode(option) {
+        // Get the code for the selected mode
+        const modeCode = option.modeScripts && option.modeScripts[option.mode] 
+            ? option.modeScripts[option.mode]
+            : 'LocalPlayer.Character.Humanoid.WalkSpeed = 50';
+
         return `MainTab:AddToggle("${option.name}", false, function(state)
     local LocalPlayer = game:GetService("Players").LocalPlayer
     if state then
         if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-            if "${option.mode}" == "CFrame Speed" then
-                -- CFrame-based speed boost
-                ${option.customCode || 'LocalPlayer.Character.Humanoid.WalkSpeed = 50'}
-            elseif "${option.mode}" == "Normal Speed" then
-                -- Normal speed modification
-                LocalPlayer.Character.Humanoid.WalkSpeed = 32
-            else
-                -- Tween speed
-                LocalPlayer.Character.Humanoid.WalkSpeed = 40
-            end
+            -- ${option.mode} mode
+            ${modeCode.split('\n').map(line => '            ' + line).join('\n').trim()}
             Library:Notify("${option.name}", "Enabled with ${option.mode}", 2)
         end
     else
@@ -137,17 +134,16 @@ end)
     }
 
     generateJumpPowerCode(option) {
+        const modeCode = option.modeScripts && option.modeScripts[option.mode] 
+            ? option.modeScripts[option.mode]
+            : 'LocalPlayer.Character.Humanoid.JumpPower = 100';
+
         return `MainTab:AddToggle("${option.name}", false, function(state)
     local LocalPlayer = game:GetService("Players").LocalPlayer
     if state then
         if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-            if "${option.mode}" == "High Jump" then
-                ${option.customCode || 'LocalPlayer.Character.Humanoid.JumpPower = 100'}
-            elseif "${option.mode}" == "Infinite Jump" then
-                LocalPlayer.Character.Humanoid.JumpPower = 120
-            else
-                LocalPlayer.Character.Humanoid.JumpPower = 70
-            end
+            -- ${option.mode} mode
+            ${modeCode.split('\n').map(line => '            ' + line).join('\n').trim()}
             Library:Notify("${option.name}", "Enabled with ${option.mode}", 2)
         end
     else
@@ -162,13 +158,28 @@ end)
     }
 
     generateFlightCode(option) {
+        const modeCode = option.modeScripts && option.modeScripts[option.mode] 
+            ? option.modeScripts[option.mode]
+            : '-- Flight code here';
+
         return `MainTab:AddToggle("${option.name}", false, function(state)
-    -- ${option.mode} implementation
     if state then
-        ${option.customCode || '-- Flight code here'}
+        -- ${option.mode} mode
+        ${modeCode.split('\n').map(line => '        ' + line).join('\n').trim()}
         Library:Notify("${option.name}", "Enabled with ${option.mode}", 2)
     else
-        -- Disable flight
+        -- Disable flight (remove BodyVelocity if exists)
+        local LocalPlayer = game:GetService("Players").LocalPlayer
+        if LocalPlayer.Character then
+            local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                for _, child in pairs(hrp:GetChildren()) do
+                    if child:IsA("BodyVelocity") or child:IsA("BodyGyro") then
+                        child:Destroy()
+                    end
+                end
+            end
+        end
         Library:Notify("${option.name}", "Disabled", 2)
     end
 end)
@@ -177,13 +188,32 @@ end)
     }
 
     generateESPCode(option) {
+        const modeCode = option.modeScripts && option.modeScripts[option.mode] 
+            ? option.modeScripts[option.mode]
+            : '-- ESP code here';
+
         return `MainTab:AddToggle("${option.name}", false, function(state)
-    -- ${option.mode} implementation
     if state then
-        ${option.customCode || '-- ESP code here'}
+        -- ${option.mode} mode
+        ${modeCode.split('\n').map(line => '        ' + line).join('\n').trim()}
         Library:Notify("${option.name}", "Enabled with ${option.mode}", 2)
     else
-        -- Disable ESP
+        -- Disable ESP (remove highlights and BillboardGuis)
+        local LocalPlayer = game:GetService("Players").LocalPlayer
+        for _, player in pairs(game.Players:GetPlayers()) do
+            if player.Character then
+                for _, obj in pairs(player.Character:GetDescendants()) do
+                    if obj:IsA("Highlight") then
+                        obj:Destroy()
+                    end
+                end
+            end
+        end
+        for _, gui in pairs(LocalPlayer.PlayerGui:GetChildren()) do
+            if gui:IsA("BillboardGui") then
+                gui:Destroy()
+            end
+        end
         Library:Notify("${option.name}", "Disabled", 2)
     end
 end)
@@ -192,10 +222,14 @@ end)
     }
 
     generateAimbotCode(option) {
+        const modeCode = option.modeScripts && option.modeScripts[option.mode] 
+            ? option.modeScripts[option.mode]
+            : '-- Aimbot code here';
+
         return `MainTab:AddToggle("${option.name}", false, function(state)
-    -- ${option.mode} implementation
     if state then
-        ${option.customCode || '-- Aimbot code here'}
+        -- ${option.mode} mode
+        ${modeCode.split('\n').map(line => '        ' + line).join('\n').trim()}
         Library:Notify("${option.name}", "Enabled with ${option.mode}", 2)
     else
         -- Disable aimbot
@@ -207,9 +241,14 @@ end)
     }
 
     generateGenericCode(option) {
+        const modeCode = option.modeScripts && option.modeScripts[option.mode] 
+            ? option.modeScripts[option.mode]
+            : (option.customCode || '-- Custom code here');
+
         return `MainTab:AddToggle("${option.name}", false, function(state)
     if state then
-        ${option.customCode || '-- Custom code here'}
+        -- ${option.mode} mode
+        ${modeCode.split('\n').map(line => '        ' + line).join('\n').trim()}
         Library:Notify("${option.name}", "Enabled with ${option.mode}", 2)
     else
         Library:Notify("${option.name}", "Disabled", 2)
@@ -227,34 +266,48 @@ end)
             'in', 'and', 'or', 'not', 'true', 'false', 'nil'
         ];
 
-        // Escape HTML
+        // Escape HTML first
         let highlighted = code
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;');
 
-        // Highlight comments
-        highlighted = highlighted.replace(/(--.*$)/gm, '<span class="comment">$1</span>');
+        // Split into lines to process one at a time
+        let lines = highlighted.split('\n');
+        let result = [];
 
-        // Highlight strings
-        highlighted = highlighted.replace(/(".*?"|'.*?')/g, '<span class="string">$1</span>');
+        for (let line of lines) {
+            let processedLine = line;
+            
+            // Check if line is a comment (must be checked first)
+            if (processedLine.trim().startsWith('--')) {
+                result.push('<span class="comment">' + processedLine + '</span>');
+                continue;
+            }
 
-        // Highlight numbers
-        highlighted = highlighted.replace(/\b(\d+)\b/g, '<span class="number">$1</span>');
+            // Highlight strings (do this before keywords to avoid conflicts)
+            processedLine = processedLine.replace(/"([^"]*)"/g, '<span class="string">"$1"</span>');
+            processedLine = processedLine.replace(/'([^']*)'/g, "<span class='string'>'$1'</span>");
 
-        // Highlight keywords
-        keywords.forEach(keyword => {
-            const regex = new RegExp(`\\b(${keyword})\\b`, 'g');
-            highlighted = highlighted.replace(regex, '<span class="keyword">$1</span>');
-        });
+            // Highlight numbers
+            processedLine = processedLine.replace(/\b(\d+\.?\d*)\b/g, '<span class="number">$1</span>');
 
-        // Highlight function names
-        highlighted = highlighted.replace(/\b([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/g, '<span class="function-name">$1</span>(');
+            // Highlight keywords (avoid replacing inside strings/spans)
+            keywords.forEach(keyword => {
+                const regex = new RegExp(`\\b(${keyword})\\b(?![^<]*>)`, 'g');
+                processedLine = processedLine.replace(regex, '<span class="keyword">$1</span>');
+            });
 
-        // Highlight operators
-        highlighted = highlighted.replace(/([+\-*/%=<>~])/g, '<span class="operator">$1</span>');
+            // Highlight function names (word before opening parenthesis)
+            processedLine = processedLine.replace(/\b([a-zA-Z_][a-zA-Z0-9_]*)\s*(?=\()/g, '<span class="function-name">$1</span>');
 
-        return highlighted;
+            // Highlight operators
+            processedLine = processedLine.replace(/([+\-*/%=<>~])/g, '<span class="operator">$1</span>');
+
+            result.push(processedLine);
+        }
+
+        return result.join('\n');
     }
 
     updateLineCount(code) {
