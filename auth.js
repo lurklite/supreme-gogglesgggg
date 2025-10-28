@@ -39,45 +39,66 @@ class AuthManager {
 
     // Handle OAuth callback
     async handleCallback(code) {
-        console.log('Handling OAuth callback...');
+        console.log('=== OAUTH CALLBACK START ===');
+        console.log('Code received:', code);
         
         try {
-            // Fetch user info directly with the code
-            const userData = await this.fetchUserInfoWithCode(code);
+            // Step 1: Exchange code for access token
+            console.log('Step 1: Exchanging code for token...');
+            const tokenData = await this.exchangeCodeForToken(code);
             
-            if (userData) {
-                console.log('User data received:', userData.username);
-                
-                this.token = code; // Store the code as token for session
-                this.user = {
-                    id: userData.id,
-                    username: userData.username,
-                    discriminator: userData.discriminator || '0',
-                    avatar: userData.avatar,
-                    displayName: userData.global_name || userData.username
-                };
-                
-                // Save session
-                this.saveSession();
-                
-                showNotification('Success', `Welcome ${this.user.displayName}!`, 'success');
-                
-                // Refresh page after a short delay
-                setTimeout(() => {
-                    window.location.reload();
-                }, 1000);
-                
-                return true;
-            } else {
-                console.error('Failed to get user data');
-                showNotification('Error', 'Failed to get Discord user information', 'error');
+            if (!tokenData || !tokenData.access_token) {
+                console.error('No access token received');
+                showNotification('Error', 'Failed to get access token from Discord', 'error');
+                return false;
             }
+            
+            console.log('✓ Access token received');
+            this.token = tokenData.access_token;
+            
+            // Step 2: Fetch user info with the access token
+            console.log('Step 2: Fetching user info...');
+            const userData = await this.fetchUserInfo(this.token);
+            
+            if (!userData) {
+                console.error('No user data received');
+                showNotification('Error', 'Failed to get user information from Discord', 'error');
+                return false;
+            }
+            
+            console.log('✓ User data received:', userData.username);
+            
+            // Step 3: Store user data
+            this.user = {
+                id: userData.id,
+                username: userData.username,
+                discriminator: userData.discriminator || '0',
+                avatar: userData.avatar,
+                displayName: userData.global_name || userData.username
+            };
+            
+            // Step 4: Save session
+            console.log('Step 3: Saving session...');
+            this.saveSession();
+            console.log('✓ Session saved');
+            
+            showNotification('Success', `Welcome ${this.user.displayName}!`, 'success');
+            
+            console.log('=== OAUTH CALLBACK SUCCESS ===');
+            
+            // Refresh page after a short delay
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+            
+            return true;
+            
         } catch (error) {
-            console.error('OAuth callback error:', error);
-            showNotification('Error', 'Authentication failed: ' + error.message, 'error');
+            console.error('=== OAUTH CALLBACK ERROR ===');
+            console.error('Error details:', error);
+            showNotification('Error', 'Authentication failed. Check console for details.', 'error');
+            return false;
         }
-        
-        return false;
     }
 
     // Fetch user info using the authorization code
@@ -121,13 +142,19 @@ class AuthManager {
 
     // Exchange authorization code for access token
     async exchangeCodeForToken(code) {
+        console.log('Exchanging code for token...');
+        console.log('Client ID: 1432798922757115985');
+        console.log('Redirect URI: https://lurklite.github.io/supreme-gogglesgggg/');
+        
         const params = new URLSearchParams({
             client_id: '1432798922757115985',
-            client_secret: 'pq_pp9Sp5lK8n3f8LC2-xAvxEROgDFdy',
+            client_secret: DISCORD_CONFIG.CLIENT_SECRET,
             grant_type: 'authorization_code',
             code: code,
             redirect_uri: 'https://lurklite.github.io/supreme-gogglesgggg/'
         });
+
+        console.log('Request body:', params.toString());
 
         try {
             const response = await fetch('https://discord.com/api/oauth2/token', {
@@ -138,21 +165,38 @@ class AuthManager {
                 body: params
             });
 
+            console.log('Token response status:', response.status);
+
             if (response.ok) {
-                return await response.json();
+                const data = await response.json();
+                console.log('✓ Token exchange successful');
+                return data;
             } else {
                 const errorData = await response.text();
-                console.error('Token exchange failed:', response.status, errorData);
+                console.error('Token exchange failed:');
+                console.error('Status:', response.status);
+                console.error('Error:', errorData);
+                
+                // Try to parse error for more details
+                try {
+                    const errorJson = JSON.parse(errorData);
+                    console.error('Error details:', errorJson);
+                } catch (e) {
+                    // Not JSON, already logged as text
+                }
+                
                 return null;
             }
         } catch (error) {
-            console.error('Token exchange error:', error);
+            console.error('Token exchange network error:', error);
             return null;
         }
     }
 
     // Fetch user info from Discord API
     async fetchUserInfo(token) {
+        console.log('Fetching user info from Discord...');
+        
         try {
             const response = await fetch('https://discord.com/api/v10/users/@me', {
                 headers: {
@@ -160,16 +204,23 @@ class AuthManager {
                 }
             });
 
+            console.log('User info response status:', response.status);
+
             if (response.ok) {
                 const userData = await response.json();
-                console.log('Discord user authenticated:', userData.username);
+                console.log('✓ User info fetched successfully');
+                console.log('Username:', userData.username);
+                console.log('ID:', userData.id);
                 return userData;
             } else {
-                console.error('Failed to fetch user info:', response.status);
+                const errorText = await response.text();
+                console.error('Failed to fetch user info:');
+                console.error('Status:', response.status);
+                console.error('Error:', errorText);
                 return null;
             }
         } catch (error) {
-            console.error('User info fetch error:', error);
+            console.error('User info fetch network error:', error);
             return null;
         }
     }
