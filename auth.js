@@ -56,7 +56,7 @@ class AuthManager {
                     // Save session
                     this.saveSession();
                     
-                    showNotification('Success', 'Logged in successfully! Refreshing...', 'success');
+                    showNotification('Success', `Logged in as ${this.user.displayName}! Refreshing...`, 'success');
                     
                     // Refresh page after a short delay
                     setTimeout(() => {
@@ -76,19 +76,16 @@ class AuthManager {
 
     // Exchange authorization code for access token
     async exchangeCode(code) {
-        // In a production environment, this should be done on the backend
-        // This is a simplified version for demonstration
-        
         const params = new URLSearchParams({
-            client_id: DISCORD_CONFIG.CLIENT_ID,
-            client_secret: DISCORD_CONFIG.CLIENT_SECRET,
+            client_id: '1432798922757115985',
+            client_secret: DISCORD_CONFIG.CLIENT_SECRET, // You'll need to set this
             grant_type: 'authorization_code',
             code: code,
-            redirect_uri: DISCORD_CONFIG.REDIRECT_URI
+            redirect_uri: 'https://lurklite.github.io/supreme-gogglesgggg/'
         });
 
         try {
-            const response = await fetch(DISCORD_CONFIG.TOKEN_URL, {
+            const response = await fetch('https://discord.com/api/oauth2/token', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded'
@@ -98,56 +95,41 @@ class AuthManager {
 
             if (response.ok) {
                 return await response.json();
+            } else {
+                const errorData = await response.text();
+                console.error('Token exchange failed:', response.status, errorData);
+                throw new Error('Token exchange failed');
             }
         } catch (error) {
             console.error('Token exchange error:', error);
-            // Fallback to demo mode if Discord API fails
-            return this.createDemoSession();
+            throw error;
         }
-        
-        // Fallback to demo mode
-        return this.createDemoSession();
     }
 
     // Fetch user info from Discord API
     async fetchUserInfo(token) {
         try {
-            const response = await fetch(`${DISCORD_CONFIG.API_ENDPOINT}/users/@me`, {
+            const response = await fetch('https://discord.com/api/v10/users/@me', {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
             });
 
             if (response.ok) {
-                return await response.json();
+                const userData = await response.json();
+                console.log('Discord user fetched:', userData.username);
+                return userData;
+            } else {
+                console.error('Failed to fetch user info:', response.status);
+                return null;
             }
         } catch (error) {
             console.error('User info fetch error:', error);
+            return null;
         }
-        
-        return null;
     }
 
-    // Create demo session (for testing without real Discord OAuth)
-    createDemoSession() {
-        // This creates a fake session for demonstration purposes
-        // Remove this in production when you have real Discord OAuth set up
-        this.token = 'demo_token_' + Math.random().toString(36).substring(7);
-        this.user = {
-            id: 'demo_' + Date.now(),
-            username: 'DemoUser',
-            discriminator: '0000',
-            avatar: null,
-            displayName: 'Demo User'
-        };
-        
-        this.saveSession();
-        showNotification('Demo Mode', 'Using demo session. Configure Discord OAuth for real authentication.', 'success');
-        
-        return { access_token: this.token };
-    }
-
-    // Save session to localStorage
+    // Save session to memory (user-specific)
     saveSession() {
         const session = {
             user: this.user,
@@ -155,12 +137,30 @@ class AuthManager {
             timestamp: Date.now()
         };
         
-        localStorage.setItem(DISCORD_CONFIG.STORAGE_KEY, JSON.stringify(session));
+        // Store session data in memory with user ID as key
+        const storageKey = `discord_session_${this.user.id}`;
+        const sessionData = JSON.stringify(session);
+        
+        // Store in memory for this session
+        window.sessionStorage = window.sessionStorage || {};
+        window.sessionStorage[storageKey] = sessionData;
+        
+        // Also keep track of current user
+        window.sessionStorage['current_user_id'] = this.user.id;
+        
+        console.log(`Session saved for user: ${this.user.displayName} (${this.user.id})`);
     }
 
-    // Load session from localStorage
+    // Load session from memory
     loadSession() {
-        const sessionData = localStorage.getItem(DISCORD_CONFIG.STORAGE_KEY);
+        const currentUserId = window.sessionStorage?.['current_user_id'];
+        
+        if (!currentUserId) {
+            return false;
+        }
+        
+        const storageKey = `discord_session_${currentUserId}`;
+        const sessionData = window.sessionStorage?.[storageKey];
         
         if (sessionData) {
             try {
@@ -172,6 +172,7 @@ class AuthManager {
                 if (daysSinceLogin < 7) {
                     this.user = session.user;
                     this.token = session.token;
+                    console.log(`Session loaded for user: ${this.user.displayName} (${this.user.id})`);
                     return true;
                 } else {
                     // Session expired
@@ -188,9 +189,15 @@ class AuthManager {
 
     // Clear session
     clearSession() {
+        if (this.user) {
+            const storageKey = `discord_session_${this.user.id}`;
+            delete window.sessionStorage?.[storageKey];
+        }
+        
+        delete window.sessionStorage?.['current_user_id'];
         this.user = null;
         this.token = null;
-        localStorage.removeItem(DISCORD_CONFIG.STORAGE_KEY);
+        console.log('Session cleared');
     }
 
     // Check if user is authenticated
@@ -216,8 +223,9 @@ class AuthManager {
 
     // Logout
     logout() {
+        const userName = this.user?.displayName || 'User';
         this.clearSession();
-        showNotification('Logged Out', 'Successfully logged out', 'success');
+        showNotification('Logged Out', `${userName} logged out successfully`, 'success');
         
         // Reload page to show login screen
         setTimeout(() => {
@@ -227,14 +235,14 @@ class AuthManager {
 
     // Initiate Discord OAuth flow
     login() {
-        // Debug: Show what URL we're using
-        console.log('=== DISCORD OAUTH DEBUG ===');
-        console.log('Current URL:', window.location.href);
-        console.log('Redirect URI:', DISCORD_CONFIG.REDIRECT_URI);
-        console.log('OAuth URL:', getDiscordOAuthURL());
-        console.log('==========================');
+        // Use the Discord-generated OAuth URL
+        const discordOAuthURL = 'https://discord.com/oauth2/authorize?client_id=1432798922757115985&response_type=code&redirect_uri=https%3A%2F%2Flurklite.github.io%2Fsupreme-gogglesgggg%2F&scope=identify';
         
-        window.location.href = getDiscordOAuthURL();
+        console.log('=== DISCORD OAUTH ===');
+        console.log('Redirecting to Discord for authentication...');
+        console.log('====================');
+        
+        window.location.href = discordOAuthURL;
     }
 }
 
